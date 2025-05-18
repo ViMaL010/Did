@@ -1,7 +1,29 @@
-import { Play } from "lucide-react";
-import { motion } from "framer-motion";
+import { Play, Menu, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function InsuranceLandingPage({ scrollToDiscovery }) {
+  // Mobile menu state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Screen size state
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check screen size on mount and resize
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Initial check
+    checkScreenSize();
+    
+    // Add resize listener
+    window.addEventListener('resize', checkScreenSize);
+    
+    // Clean up
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
   // Animation variants
   const fadeIn = {
     hidden: { opacity: 0 },
@@ -67,6 +89,26 @@ export default function InsuranceLandingPage({ scrollToDiscovery }) {
     }
   };
 
+  // Mobile menu animation variants
+  const mobileMenuVariants = {
+    closed: {
+      opacity: 0,
+      x: "100%",
+      transition: {
+        type: "tween",
+        duration: 0.3
+      }
+    },
+    open: {
+      opacity: 1,
+      x: 0,
+      transition: {
+        type: "tween",
+        duration: 0.3
+      }
+    }
+  };
+
   return (
     <motion.div
       initial="hidden"
@@ -93,9 +135,10 @@ export default function InsuranceLandingPage({ scrollToDiscovery }) {
             variants={fadeIn}
             className="flex items-center"
           >
-            <h1 className="text-2xl font-cursive font-bold">Logo</h1>
+            <h1 className="text-xl md:text-2xl font-cursive font-bold">Logo</h1>
           </motion.div>
 
+          {/* Desktop Navigation */}
           <motion.div
             initial="hidden"
             animate="visible"
@@ -160,32 +203,102 @@ export default function InsuranceLandingPage({ scrollToDiscovery }) {
             </motion.a>
           </motion.div>
 
-          <motion.div
-            variants={fadeIn}
-            whileHover={{ scale: 1.05 }}
-            transition={{ type: "spring", stiffness: 400, damping: 10 }}
-          >
-            <button 
-              className="bg-gray-800 text-white px-6 py-2 rounded-full hover:bg-gray-700 transition-colors"
-              onClick={scrollToDiscovery}
+          {/* Desktop CTA Button */}
+          <div className="hidden md:block">
+            <motion.div
+              variants={fadeIn}
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: "spring", stiffness: 400, damping: 10 }}
             >
-              Get Free Advice Now
-            </button>
-          </motion.div>
+              <button 
+                className="bg-gray-800 text-white px-6 py-2 rounded-full hover:bg-gray-700 transition-colors"
+                onClick={scrollToDiscovery}
+              >
+                Get Free Advice Now
+              </button>
+            </motion.div>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <motion.button
+            variants={fadeIn}
+            className="md:hidden z-50"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+          >
+            {mobileMenuOpen ? (
+              <X size={24} className="text-gray-800" />
+            ) : (
+              <Menu size={24} className="text-gray-800" />
+            )}
+          </motion.button>
+
+          {/* Mobile Menu */}
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.div
+                initial="closed"
+                animate="open"
+                exit="closed"
+                variants={mobileMenuVariants}
+                className="fixed inset-0 bg-white flex flex-col z-40 p-8 md:hidden"
+              >
+                <div className="flex flex-col items-center justify-center space-y-8 mt-16">
+                  <a 
+                    href="#"
+                    className="text-gray-800 text-xl font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Home
+                  </a>
+                  <a 
+                    href="#"
+                    className="text-gray-800 text-xl font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    See AI in Action
+                  </a>
+                  <a 
+                    href="#"
+                    className="text-gray-800 text-xl font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Coverage Options
+                  </a>
+                  <a 
+                    href="#"
+                    className="text-gray-800 text-xl font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Plans & Costs
+                  </a>
+                  <button 
+                    className="bg-gray-800 text-white px-6 py-3 rounded-full mt-6"
+                    onClick={() => {
+                      scrollToDiscovery();
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    Get Free Advice Now
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </nav>
 
         {/* Hero Section */}
-        <div className="container mx-auto px-4 py-20 text-center">
+        <div className="container mx-auto px-4 py-10 md:py-20 text-center">
           <motion.h2
             variants={slideInFromTop}
-            className="text-5xl font-bold text-gray-800 mb-6"
+            className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4 md:mb-6"
           >
-            Get Personalized Insurance <br /> Advice Instantly
+            Get Personalized Insurance{isMobile ? " " : <br />}Advice Instantly
           </motion.h2>
 
           <motion.p
             variants={slideInFromBottom}
-            className="text-lg text-gray-600 max-w-3xl mx-auto mb-12"
+            className="text-base md:text-lg text-gray-600 max-w-3xl mx-auto mb-8 md:mb-12 px-2"
           >
             Choose an insurance type, connect with a live expert via video call, and get tailored policy
             suggestions within minutes.
@@ -193,12 +306,12 @@ export default function InsuranceLandingPage({ scrollToDiscovery }) {
 
           <motion.div
             variants={staggerButtons}
-            className="flex flex-col md:flex-row justify-center gap-4"
+            className="flex flex-col sm:flex-row justify-center gap-4"
           >
             <motion.button
               variants={buttonVariant}
               whileHover="hover"
-              className="bg-gray-800 text-white px-8 py-3 rounded-md hover:bg-gray-700 transition-colors"
+              className="bg-gray-800 text-white px-6 md:px-8 py-3 rounded-md hover:bg-gray-700 transition-colors"
               onClick={scrollToDiscovery}
             >
               Explore Plans
@@ -207,7 +320,7 @@ export default function InsuranceLandingPage({ scrollToDiscovery }) {
             <motion.button
               variants={buttonVariant}
               whileHover="hover"
-              className="border border-gray-300 text-gray-800 px-8 py-3 rounded-md hover:bg-gray-50 transition-colors flex items-center justify-center"
+              className="border border-gray-300 text-gray-800 px-6 md:px-8 py-3 rounded-md hover:bg-gray-50 transition-colors flex items-center justify-center"
               onClick={scrollToDiscovery}
             >
               Watch Demo
