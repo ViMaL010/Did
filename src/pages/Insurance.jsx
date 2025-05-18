@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 
 const InsuranceDiscovery = () => {
   const navigate = useNavigate();
@@ -12,6 +12,10 @@ const InsuranceDiscovery = () => {
   });
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // References for viewport detection
+  const componentRef = useRef(null);
+  const isInView = useInView(componentRef, { once: true, margin: "-100px 0px" });
   
   // Simulated navigation with loader
   const handleNavigate = () => {
@@ -143,12 +147,12 @@ const InsuranceDiscovery = () => {
   };
 
   return (
-    <div className="bg-gray-100 min-h-screen py-8 px-4">
+    <div className="bg-gray-100 min-h-screen py-8 px-4" ref={componentRef}>
       <div className="max-w-4xl mx-auto">
         <motion.div 
           className="text-center mb-10"
           initial="hidden"
-          animate="visible"
+          animate={isInView ? "visible" : "hidden"}
           variants={containerVariants}
         >
           <motion.h1 
@@ -271,7 +275,7 @@ const InsuranceDiscovery = () => {
               key="form"
               className="bg-white rounded-lg shadow-md p-6 md:p-8 max-w-md mx-auto"
               initial="hidden"
-              animate="visible"
+              animate={isInView ? "visible" : "hidden"}
               exit="exit"
               variants={containerVariants}
             >
@@ -348,7 +352,7 @@ const InsuranceDiscovery = () => {
             <motion.div
               key="results"
               initial="hidden"
-              animate="visible"
+              animate={isInView ? "visible" : "hidden"}
               exit="exit"
               variants={containerVariants}
             >
@@ -361,12 +365,12 @@ const InsuranceDiscovery = () => {
                     variants={cardVariants}
                     whileHover="hover"
                     initial="hidden"
-                    animate="visible"
+                    animate={isInView ? "visible" : "hidden"}
                   >
                     <motion.div 
                       className="bg-blue-500 text-white p-4"
                       initial={{ opacity: 0 }}
-                      animate={{ opacity: 1, transition: { delay: 0.3 + index * 0.2 } }}
+                      animate={isInView ? { opacity: 1, transition: { delay: 0.3 + index * 0.2 } } : { opacity: 0 }}
                     >
                       <h2 className="text-xl font-semibold">{plan.title}</h2>
                       <p className="text-2xl font-bold">${plan.price}/month</p>
@@ -379,11 +383,14 @@ const InsuranceDiscovery = () => {
                             key={i} 
                             className="flex items-start"
                             initial={{ opacity: 0, x: -10 }}
-                            animate={{ 
-                              opacity: 1, 
-                              x: 0,
-                              transition: { delay: 0.5 + index * 0.1 + i * 0.1 } 
-                            }}
+                            animate={isInView 
+                              ? { 
+                                  opacity: 1, 
+                                  x: 0,
+                                  transition: { delay: 0.5 + index * 0.1 + i * 0.1 } 
+                                }
+                              : { opacity: 0, x: -10 }
+                            }
                           >
                             <div className="mr-2 mt-1 text-blue-500">•</div>
                             <span>{benefit}</span>
@@ -426,8 +433,10 @@ const InsuranceDiscovery = () => {
               <motion.div 
                 className="max-w-2xl mx-auto text-center"
                 initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8, duration: 0.5 }}
+                animate={isInView 
+                  ? { opacity: 1, y: 0, transition: { delay: 0.8, duration: 0.5 } }
+                  : { opacity: 0, y: 30 }
+                }
               >
                 <p className="text-lg mb-4">Want a copy of your conversation and curated policies?</p>
                 <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-3">
