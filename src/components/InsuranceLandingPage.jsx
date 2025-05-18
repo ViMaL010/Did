@@ -81,16 +81,17 @@ export default function InsuranceLandingPage({ scrollToDiscovery }) {
       className="min-h-screen bg-white font-sans relative overflow-hidden"
     >
       {/* Background Image with simple fade-in animation */}
-      <motion.div
-        variants={fadeIn}
-        className="absolute inset-0 w-full h-full z-0 opacity-60"
-      >
-        <img
-          src="/back.svg"
-          alt="Travel landmarks background"
-          className="w-full h-full object-cover"
-        />
-      </motion.div>
+<motion.div
+  variants={fadeIn}
+  className="absolute inset-0 w-full h-full z-0 opacity-60"
+>
+  <img
+    src="/dubai.svg"
+    alt="Travel landmarks background"
+    className="w-full h-full object-contain mt-40 md:mt-20 md:object-cover opacity-20"
+  />
+</motion.div>
+
 
       {/* Content */}
       <div className="relative z-10">

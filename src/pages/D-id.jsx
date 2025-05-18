@@ -6,156 +6,242 @@ import { FaMicrophoneAlt } from 'react-icons/fa';
 
 function DID() {
   const [agentId] = useState("agt__Wn9qEep");
-  const [auth] = useState({ type: 'key', clientKey: "Z29vZ2xlLW9hdXRoMnwxMDEyMzg3MTgzNzA5NjkxMzEyMTM6RHdqS001QkpsTUVaenhlUERQTGdz" });
-  const [streamOptions] = useState({ compatibilityMode: "auto", streamWarmup: true });
+  const [auth] = useState({ type: 'key', clientKey: "YXV0aDB8NjgyYTBjNDg4MThkZjEzYWQzZDUzMDdkOm9KZmVfZTEwUHI3cDNxYTZlXzhXNA==" });
   const [agentManager, setAgentManager] = useState(null);
   const [connectionState, setConnectionState] = useState("Connecting...");
   const [isHidden, setIsHidden] = useState(false);
   const [messages, setMessages] = useState([]);
   const [isChatExpanded, setIsChatExpanded] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const videoElementRef = useRef(null);
   const textAreaRef = useRef(null);
   const answersRef = useRef(null);
   const speechButtonRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const processedMessageIds = useRef(new Set()); // Track processed message IDs
 
-  // Callbacks
-  const callbacks = {
-    onSrcObjectReady(value) {
-      if (videoElementRef.current) {
-        videoElementRef.current.srcObject = value;
-      }
-      return value;
-    },
-
-    onConnectionStateChange(state) {
-      setConnectionState(state === "connected" ? "Online" : state === "connecting" ? "Connecting..." : "");
-
-      if (state === "connected") {
-        if (textAreaRef.current) {
-          textAreaRef.current.addEventListener('keypress', (event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              chat();
-            }
-          });
-        }
-      } else if (state === "disconnected" || state === "closed") {
-        if (textAreaRef.current) {
-          textAreaRef.current.removeEventListener('keypress', (event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              chat();
-            }
-          });
-        }
-        setIsHidden(true);
-      }
-    },
-
-    onVideoStateChange(state) {
-      if (state === "STOP" && videoElementRef.current) {
-        videoElementRef.current.muted = true;
-        videoElementRef.current.srcObject = undefined;
-        if (agentManager) {
-          videoElementRef.current.src = agentManager.agent.presenter.idle_video;
-        }
-      } else if (videoElementRef.current) {
-        videoElementRef.current.muted = false;
-        videoElementRef.current.src = "";
-        if (agentManager) {
-          videoElementRef.current.srcObject = agentManager.srcObject;
-        }
-        setConnectionState("Online");
-      }
-    },
-
-    onNewMessage(msgArray, type) {
-      const lastIndex = msgArray.length - 1;
-      const msg = msgArray[lastIndex];
-
-      if (!msg || !msg.role) {
-        console.error("Invalid message format:", msg);
-        return;
-      }
-
-      const newMessage = {
-        role: msg.role === "assistant" ? "agent" : "user",
-        content: msg.content,
-        id: msg.id,
-        type: type,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, newMessage]);
-
-      if (answersRef.current) {
-        answersRef.current.scrollTop = answersRef.current.scrollHeight;
-      }
-    },
-
-    onError(error, errorData) {
-      setConnectionState("Error");
-      console.log("Error:", error, "Error Data", errorData);
-    }
-  };
-
-  // Initialize agent manager
+  // Initialize speech recognition
   useEffect(() => {
-    const initializeAgentManager = async () => {
-      if (agentId && auth.clientKey) {
-        try {
-          const manager = await sdk.createAgentManager(agentId, { auth, callbacks, streamOptions });
-          setAgentManager(manager);
-          
-          if (videoElementRef.current && manager.agent.presenter.source_url) {
-            videoElementRef.current.style.backgroundImage = `url(${manager.agent.presenter.source_url})`;
-          }
-          
-          // manager.connect();
-        } catch (error) {
-          console.error("Error initializing agent manager:", error);
-        }
-      } else {
-        console.error("Missing agentID and auth.clientKey variables");
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      console.warn("Speech recognition not supported in this browser");
+      return;
+    }
+
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = 'en-US';
+
+    recognitionRef.current.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map(result => result[0])
+        .map(result => result.transcript)
+        .join('');
+      
+      if (textAreaRef.current) {
+        textAreaRef.current.value = transcript;
       }
     };
 
-    initializeAgentManager();
+    recognitionRef.current.onerror = (event) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+      if (speechButtonRef.current) {
+        speechButtonRef.current.classList.remove('recording');
+      }
+    };
+
+    recognitionRef.current.onend = () => {
+      if (isListening) {
+        recognitionRef.current.start();
+      }
+    };
+
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
+  // Initialize agent manager
+  useEffect(() => {
+    const initializeAgent = async () => {
+      try {
+        const callbacks = {
+          onSrcObjectReady: (stream) => {
+            if (videoElementRef.current) {
+              videoElementRef.current.srcObject = stream;
+            }
+          },
+          onConnectionStateChange: (state) => {
+            setConnectionState(state === "connected" ? "Online" : "Connecting...");
+            if (state === "connected") {
+              if (textAreaRef.current) {
+                textAreaRef.current.addEventListener('keypress', (event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    chat();
+                  }
+                });
+              }
+            } else if (state === "disconnected" || state === "closed") {
+              if (textAreaRef.current) {
+                textAreaRef.current.removeEventListener('keypress', (event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    chat();
+                  }
+                });
+              }
+              setIsHidden(true);
+            }
+          },
+          onVideoStateChange: (state) => {
+            if (!videoElementRef.current) return;
+            
+            if (state === "STOP") {
+              videoElementRef.current.muted = true;
+              if (agentManager?.agent?.presenter?.idle_video) {
+                videoElementRef.current.src = agentManager.agent.presenter.idle_video;
+              }
+            } else {
+              videoElementRef.current.muted = false;
+              if (agentManager?.srcObject) {
+                videoElementRef.current.srcObject = agentManager.srcObject;
+              }
+            }
+          },
+          onNewMessage: async (newMessages) => {
+            if (!newMessages?.length) return;
+            
+            const lastMsg = newMessages[newMessages.length - 1];
+            
+            // Skip if we've already processed this message
+            if (processedMessageIds.current.has(lastMsg.id)) {
+              return;
+            }
+
+            if (lastMsg?.role === "assistant") {
+              try {
+                // Mark this message as processed
+                processedMessageIds.current.add(lastMsg.id);
+                setIsSpeaking(true);
+                
+                // Add to chat only if it's a new message
+                setMessages(prev => {
+                  // Check if this message already exists in the chat
+                  const exists = prev.some(msg => msg.id === lastMsg.id);
+                  if (!exists) {
+                    return [...prev, {
+                      role: "agent",
+                      content: lastMsg.content,
+                      id: lastMsg.id, // Use the original message ID
+                      timestamp: new Date()
+                    }];
+                  }
+                  return prev;
+                });
+
+                // Then speak
+                await agentManager.speak({
+                  type: "text",
+                  input: lastMsg.content,
+                  lipSync: true
+                });
+
+              } catch (error) {
+                console.error("Speak error:", error);
+              } finally {
+                setIsSpeaking(false);
+              }
+            }
+          },
+          onError: (error, errorData) => {
+            setConnectionState("Error");
+            console.error("Agent Error:", error, errorData);
+          }
+        };
+
+        const manager = await sdk.createAgentManager(agentId, {
+          auth,
+          callbacks,
+          streamOptions: {
+            compatibilityMode: "auto",
+            streamWarmup: true
+          }
+        });
+
+        setAgentManager(manager);
+        await manager.connect();
+
+      } catch (error) {
+        console.error("Initialization failed:", error);
+      }
+    };
+
+    initializeAgent();
 
     return () => {
       if (agentManager) {
         agentManager.disconnect();
       }
     };
-  }, [agentId, auth.clientKey]);
+  }, []);
 
-  // Functions
-  const speak = () => {
-    const val = textAreaRef.current?.value;
-    if (val && val.length > 2 && agentManager) {
-      agentManager.speak({ type: "text", input: val });
-      setConnectionState("Streaming...");
-      textAreaRef.current.value = "";
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      console.error("Speech recognition not initialized");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      speechButtonRef.current?.classList.remove('recording');
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+        speechButtonRef.current?.classList.add('recording');
+      } catch (error) {
+        console.error("Error starting speech recognition:", error);
+      }
     }
   };
 
-  const chat = () => {
-    const val = textAreaRef.current?.value;
-    if (val && val !== "" && agentManager) {
-      const userMessage = {
-        role: "user",
-        content: val,
-        id: `user-${Date.now()}`,
+  const chat = async () => {
+    const message = textAreaRef.current?.value.trim();
+    if (!message || !agentManager) return;
+
+    // Add user message to chat
+    setMessages(prev => [...prev, {
+      role: "user",
+      content: message,
+      id: `user-${Date.now()}`,
+      timestamp: new Date()
+    }]);
+
+    textAreaRef.current.value = '';
+
+    try {
+      setConnectionState("Agent is responding...");
+      await agentManager.chat(message);
+      setConnectionState("Online");
+    } catch (error) {
+      console.error("Chat error:", error);
+      setMessages(prev => [...prev, {
+        role: "agent",
+        content: "Sorry, I couldn't process that request.",
+        id: `error-${Date.now()}`,
         timestamp: new Date()
-      };
-      setMessages(prev => [...prev, userMessage]);
-      
-      agentManager.chat(val);
-      setConnectionState("Thinking...");
-      textAreaRef.current.value = "";
+      }]);
     }
   };
+
+  // ... rest of the component code remains the same ...
 
   const rate = (messageID, score) => {
     if (agentManager) {
@@ -167,16 +253,6 @@ function DID() {
     if (agentManager) {
       agentManager.reconnect();
       setIsHidden(false);
-    }
-  };
-
-  const toggleStartStop = () => {
-    if (speechButtonRef.current.classList.contains('recording')) {
-      window.stopSpeechRecognition();
-      speechButtonRef.current.classList.remove('recording');
-    } else {
-      window.startSpeechRecognition();
-      speechButtonRef.current.classList.add('recording');
     }
   };
 
@@ -256,7 +332,7 @@ function DID() {
           className={`bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-300 ${isHidden ? 'hidden' : 'block'}`}
         >
           <div className="flex flex-col md:flex-row">
-            {/* Video section - smaller as requested */}
+            {/* Video section */}
             <div className={`relative transition-all duration-300 ${isChatExpanded ? 'w-full md:w-1/3' : 'w-full md:w-2/3'}`}>
               <div className="absolute top-0 left-0 w-full p-3 bg-gradient-to-b from-black/50 to-transparent text-white flex justify-between items-center z-10">
                 <span className="text-lg font-semibold">
@@ -272,6 +348,14 @@ function DID() {
                 className="w-full object-cover bg-center bg-no-repeat bg-cover aspect-[4/3] md:aspect-auto md:h-full"
                 autoPlay 
                 loop
+                muted={false}
+                style={{
+                  backgroundImage: agentManager?.agent?.presenter?.source_url 
+                    ? `url(${agentManager.agent.presenter.source_url})` 
+                    : 'none',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                }}
               ></video>
               
               <button 
@@ -284,7 +368,7 @@ function DID() {
               </button>
             </div>
             
-            {/* Chat section - larger as requested */}
+            {/* Chat section */}
             <div className={`bg-white transition-all duration-300 flex flex-col ${isChatExpanded ? 'w-full md:w-2/3' : 'w-full md:w-1/3'}`}>
               <div className="flex border-b border-gray-200">
                 <div className="py-2 px-4 font-medium cursor-pointer border-b-2 border-b-grey-500 text-grey-500">
@@ -328,23 +412,26 @@ function DID() {
               </div>
               
               <div className="flex gap-2 px-3 pb-3">
-                {/* <button 
-                  ref={speechButtonRef}
-                  onClick={toggleStartStop}
-                  className="w-9 h-9 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center transition-all duration-300 hover:bg-gray-200"
-                >🎤</button> */}
-
-<button
-  onClick={chat}
-  className="flex-grow flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-full transition-all duration-300 hover:bg-gray-800 active:scale-95"
->
-  Send <IoSend />
-</button>
-
                 <button 
-                  onClick={speak}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-full border border-gray-200 transition-all duration-300 hover:bg-gray-200 active:scale-95"
-                ><FaMicrophoneAlt /></button>
+                  ref={speechButtonRef}
+                  onClick={toggleListening}
+                  disabled={!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    isListening 
+                      ? 'bg-red-500 text-white animate-pulse' 
+                      : 'bg-gray-100 border border-gray-200 hover:bg-gray-200'
+                  }`}
+                  title={isListening ? "Stop listening" : "Start speaking"}
+                >
+                  <FaMicrophoneAlt />
+                </button>
+
+                <button
+                  onClick={chat}
+                  className="flex-grow flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-full transition-all duration-300 hover:bg-gray-800 active:scale-95"
+                >
+                  Send <IoSend />
+                </button>
               </div>
             </div>
           </div>
