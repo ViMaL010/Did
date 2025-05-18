@@ -47,10 +47,10 @@ const HowItWorks = () => {
                 <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3">
                   1
                 </div>
-                <h3 className="font-semibold text-lg">Choose Your Insurance</h3>
+                <h3 className="font-semibold text-lg">Choose Your Insurance Type</h3>
               </div>
               <p className="text-gray-600">
-                Select from our range of insurance options tailored to your specific needs.
+                Select the appropriate insurance category
               </p>
             </div>
             
@@ -60,10 +60,10 @@ const HowItWorks = () => {
                 <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3">
                   2
                 </div>
-                <h3 className="font-semibold text-lg">Connect with Expert</h3>
+                <h3 className="font-semibold text-lg">Start a video call</h3>
               </div>
               <p className="text-gray-600">
-                Schedule a video call with one of our insurance specialists.
+                Connect with an advisor for discussion
               </p>
             </div>
             
@@ -73,25 +73,14 @@ const HowItWorks = () => {
                 <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3">
                   3
                 </div>
-                <h3 className="font-semibold text-lg">Get Personalized Advice</h3>
+                <h3 className="font-semibold text-lg">Get Personalized recommendations</h3>
               </div>
               <p className="text-gray-600">
                 Receive tailored policy suggestions based on your situation.
               </p>
             </div>
             
-            {/* Step 4 */}
-            <div className="bg-gray-50 rounded-lg p-6 shadow-sm">
-              <div className="flex items-center mb-4">
-                <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3">
-                  4
-                </div>
-                <h3 className="font-semibold text-lg">Finalize Your Plan</h3>
-              </div>
-              <p className="text-gray-600">
-                Select and confirm your insurance coverage with our easy process.
-              </p>
-            </div>
+            
           </div>
         </div>
       </div>
