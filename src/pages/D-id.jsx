@@ -6,7 +6,7 @@ import { FaMicrophoneAlt } from 'react-icons/fa';
 
 function DID() {
   const [agentId] = useState("agt__Wn9qEep");
-  const [auth] = useState({ type: 'key', clientKey: "YXV0aDB8NjgyYWJjZDA2NTFkMzc3NTUwM2MxMGMzOmJfS25YM2VPcnZ6Z0wxeW5sWTJOcw==" });
+  const [auth] = useState({ type: 'key', clientKey: "" });
   const [agentManager, setAgentManager] = useState(null);
   const [connectionState, setConnectionState] = useState("Connecting...");
   const [isHidden, setIsHidden] = useState(false);
