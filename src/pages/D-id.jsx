@@ -6,7 +6,7 @@ import { FaMicrophoneAlt } from 'react-icons/fa';
 
 function DID() {
   const [agentId] = useState("agt__Wn9qEep");
-  const [auth] = useState({ type: 'key', clientKey: "YXV0aDB8NjgyYTBjNDg4MThkZjEzYWQzZDUzMDdkOm9KZmVfZTEwUHI3cDNxYTZlXzhXNA==" });
+  const [auth] = useState({ type: 'key', clientKey: "YXV0aDB8NjgyYWJjZDA2NTFkMzc3NTUwM2MxMGMzOmJfS25YM2VPcnZ6Z0wxeW5sWTJOcw==" });
   const [agentManager, setAgentManager] = useState(null);
   const [connectionState, setConnectionState] = useState("Connecting...");
   const [isHidden, setIsHidden] = useState(false);
@@ -14,13 +14,33 @@ function DID() {
   const [isChatExpanded, setIsChatExpanded] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const videoElementRef = useRef(null);
   const textAreaRef = useRef(null);
   const answersRef = useRef(null);
   const speechButtonRef = useRef(null);
   const recognitionRef = useRef(null);
-  const processedMessageIds = useRef(new Set()); // Track processed message IDs
+  const processedMessageIds = useRef(new Set());
+
+  // Safe speak function with error handling
+  const safeSpeak = async (content) => {
+    if (!agentManager) {
+      console.warn("Agent manager not available for speaking");
+      return;
+    }
+    
+    try {
+      await agentManager.speak({
+        type: "text",
+        input: content,
+        lipSync: true
+      });
+    } catch (error) {
+      console.error("Speaking failed:", error);
+      throw error;
+    }
+  };
 
   // Initialize speech recognition
   useEffect(() => {
@@ -68,7 +88,11 @@ function DID() {
 
   // Initialize agent manager
   useEffect(() => {
+    let isMounted = true;
+    let manager = null;
+
     const initializeAgent = async () => {
+      setIsInitializing(true);
       try {
         const callbacks = {
           onSrcObjectReady: (stream) => {
@@ -104,53 +128,44 @@ function DID() {
             
             if (state === "STOP") {
               videoElementRef.current.muted = true;
-              if (agentManager?.agent?.presenter?.idle_video) {
-                videoElementRef.current.src = agentManager.agent.presenter.idle_video;
+              if (manager?.agent?.presenter?.idle_video) {
+                videoElementRef.current.src = manager.agent.presenter.idle_video;
               }
             } else {
               videoElementRef.current.muted = false;
-              if (agentManager?.srcObject) {
-                videoElementRef.current.srcObject = agentManager.srcObject;
+              if (manager?.srcObject) {
+                videoElementRef.current.srcObject = manager.srcObject;
               }
             }
           },
           onNewMessage: async (newMessages) => {
-            if (!newMessages?.length) return;
+            if (!newMessages?.length || !manager) return;
             
             const lastMsg = newMessages[newMessages.length - 1];
             
-            // Skip if we've already processed this message
             if (processedMessageIds.current.has(lastMsg.id)) {
               return;
             }
 
             if (lastMsg?.role === "assistant") {
               try {
-                // Mark this message as processed
                 processedMessageIds.current.add(lastMsg.id);
                 setIsSpeaking(true);
                 
-                // Add to chat only if it's a new message
                 setMessages(prev => {
-                  // Check if this message already exists in the chat
                   const exists = prev.some(msg => msg.id === lastMsg.id);
                   if (!exists) {
                     return [...prev, {
                       role: "agent",
                       content: lastMsg.content,
-                      id: lastMsg.id, // Use the original message ID
+                      id: lastMsg.id,
                       timestamp: new Date()
                     }];
                   }
                   return prev;
                 });
 
-                // Then speak
-                await agentManager.speak({
-                  type: "text",
-                  input: lastMsg.content,
-                  lipSync: true
-                });
+                await safeSpeak(lastMsg.content);
 
               } catch (error) {
                 console.error("Speak error:", error);
@@ -165,7 +180,7 @@ function DID() {
           }
         };
 
-        const manager = await sdk.createAgentManager(agentId, {
+        manager = await sdk.createAgentManager(agentId, {
           auth,
           callbacks,
           streamOptions: {
@@ -174,19 +189,29 @@ function DID() {
           }
         });
 
-        setAgentManager(manager);
-        await manager.connect();
+        if (isMounted) {
+          setAgentManager(manager);
+          await manager.connect();
+        }
 
       } catch (error) {
         console.error("Initialization failed:", error);
+        if (isMounted) {
+          setConnectionState("Initialization Failed");
+        }
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
       }
     };
 
     initializeAgent();
 
     return () => {
-      if (agentManager) {
-        agentManager.disconnect();
+      isMounted = false;
+      if (manager) {
+        manager.disconnect();
       }
     };
   }, []);
@@ -214,7 +239,17 @@ function DID() {
 
   const chat = async () => {
     const message = textAreaRef.current?.value.trim();
-    if (!message || !agentManager) return;
+    if (!message) return;
+
+    if (!agentManager) {
+      setMessages(prev => [...prev, {
+        role: "agent",
+        content: "Agent is not ready yet. Please try again.",
+        id: `error-${Date.now()}`,
+        timestamp: new Date()
+      }]);
+      return;
+    }
 
     // Add user message to chat
     setMessages(prev => [...prev, {
@@ -238,10 +273,9 @@ function DID() {
         id: `error-${Date.now()}`,
         timestamp: new Date()
       }]);
+      setConnectionState("Error");
     }
   };
-
-  // ... rest of the component code remains the same ...
 
   const rate = (messageID, score) => {
     if (agentManager) {
@@ -272,9 +306,15 @@ function DID() {
           message.role === 'agent' ? 'agent' : 'user'
         }`}
       >
-        <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
-          <img src="/api/placeholder/32/32" alt={`${message.role} Avatar`} className="w-full h-full object-cover" />
-        </div>
+<div className={`w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center ${
+  message.role === 'agent' ? 'bg-blue-100' : 'bg-gray-100'
+}`}>
+  <span className={`text-sm font-medium ${
+    message.role === 'agent' ? 'text-blue-600' : 'text-gray-600'
+  }`}>
+    {message.role === 'agent' ? 'A' : 'U'}
+  </span>
+</div>
         <div className="max-w-[calc(100%-40px)]">
           <div className={`
             p-2.5 px-4 rounded-2xl shadow-sm transition-transform duration-300 ease-in-out break-words
@@ -312,6 +352,16 @@ function DID() {
       <Navbar />
       <div className="w-full py-4 px-4 md:px-6 max-w-6xl mx-auto">
         
+        {/* Loading overlay */}
+        {isInitializing && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="text-white text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
+              <p>Initializing agent...</p>
+            </div>
+          </div>
+        )}
+
         {/* Reconnect overlay */}
         {isHidden && (
           <div className="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50">
