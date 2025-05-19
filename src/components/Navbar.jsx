@@ -75,9 +75,11 @@ export default function Navbar({ scrollToDiscovery }) {
       <motion.div
         variants={fadeIn}
         className="flex items-center"
-      >
-        <h1 className="text-xl md:text-2xl font-cursive font-bold">Logo</h1>
-      </motion.div>
+      >  <img 
+    src="/asset.svg" 
+    alt="Logo" 
+    className="h-8 w-30 md:h-10" 
+  /></motion.div>
 
       {/* Desktop Navigation */}
       <motion.div
